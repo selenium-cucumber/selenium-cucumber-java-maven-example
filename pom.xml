@@ -45,11 +45,10 @@
 			<artifactId>selenium-server</artifactId>
 			<version>3.5.2</version>
 		</dependency>
-
 		<dependency>
-		    <groupId>com.github.geekdenz</groupId>
+		    <groupId>com.github.selenium-cucumber</groupId>
 		    <artifactId>selenium-cucumber-java</artifactId>
-		    <version>0.1.8</version>
+		    <version>1.0.0</version>
 		</dependency>
 	</dependencies>
 	
