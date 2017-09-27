@@ -1,4 +1,4 @@
-selenium-cucumber-java
+selenium-cucumber-java-maven
 =================
 
 selenium-cucumber : Automation Testing Using Java
