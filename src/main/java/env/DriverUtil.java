@@ -3,13 +3,13 @@ package env;
 import java.util.concurrent.TimeUnit;
 
 import org.openqa.selenium.By;
-import org.openqa.selenium.Dimension;
 import org.openqa.selenium.NoSuchSessionException;
 import org.openqa.selenium.SessionNotCreatedException;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
 import org.openqa.selenium.chrome.ChromeDriver;
 import org.openqa.selenium.chrome.ChromeOptions;
+import org.openqa.selenium.edge.EdgeDriver;
 import org.openqa.selenium.firefox.FirefoxDriver;
 import org.openqa.selenium.firefox.FirefoxOptions;
 import org.openqa.selenium.phantomjs.PhantomJSDriver;
@@ -20,9 +20,7 @@ import org.openqa.selenium.support.ui.WebDriverWait;
 
 public class DriverUtil {
     public static long DEFAULT_WAIT = 20;
-    private static int DEFAULT_WINDOW_WIDTH = 1920;
-    private static int DEFAULT_WINDOW_HEIGHT = 1080;
-	protected static WebDriver driver;
+    protected static WebDriver driver;
 
     public static WebDriver getDefaultDriver() {
 		if (driver != null) {
@@ -30,20 +28,18 @@ public class DriverUtil {
 		}
         //System.setProperty("webdriver.chrome.driver", "webdrivers/chromedriver.exe");
         //System.setProperty("webdriver.gecko.driver", "./geckodriver");
-        DesiredCapabilities capabilities = null; //DesiredCapabilities.phantomjs();
+        DesiredCapabilities capabilities = null;
 		capabilities = DesiredCapabilities.firefox();
         capabilities.setJavascriptEnabled(true);
         capabilities.setCapability("takesScreenshot", true);
         driver = chooseDriver(capabilities);
-        driver.manage().timeouts().setScriptTimeout(DEFAULT_WAIT,
-                TimeUnit.SECONDS);
-        driver.manage().window().setSize(new Dimension(DEFAULT_WINDOW_WIDTH,
-                DEFAULT_WINDOW_HEIGHT));
+        driver.manage().timeouts().setScriptTimeout(DEFAULT_WAIT, TimeUnit.SECONDS);
+        driver.manage().window().maximize();
         return driver;
     }
 
     /**
-     * By default to web driver will be PhantomJS
+     * By default to web driver will be firefox
      *
      * Override it by passing -Dbrowser=Chrome to the command line arguments
      * @param capabilities
@@ -54,28 +50,41 @@ public class DriverUtil {
 		boolean headless = System.getProperty("Headless", "false").equals("true");
 		
 		switch (preferredDriver.toLowerCase()) {
+			case "edge":
+				try {
+					driver = new EdgeDriver();
+				}catch(Exception e) {
+					System.out.println(e.getMessage());
+					System.exit(0);
+				}
+				return driver;
 			case "chrome":
 				final ChromeOptions chromeOptions = new ChromeOptions();
 				if (headless) {
 					chromeOptions.addArguments("--headless");
 				}
 				capabilities.setCapability(ChromeOptions.CAPABILITY, chromeOptions);
-				ChromeDriver driver = new ChromeDriver(capabilities);
-				ErrorHandler handler = new ErrorHandler();
-				handler.setIncludeServerErrors(false);
-				driver.setErrorHandler(handler);
+				try
+				{
+					ChromeDriver driver = new ChromeDriver();
+					ErrorHandler handler = new ErrorHandler();
+					handler.setIncludeServerErrors(false);
+					driver.setErrorHandler(handler);
+				}catch(Exception e) {
+					System.out.println(e.getMessage());
+					System.exit(0);
+				}
+				
 				return driver;
 			case "PhantomJS":
 				return new PhantomJSDriver(capabilities);
 			default:
-				//return new PhantomJSDriver(capabilities);
 				FirefoxOptions options = new FirefoxOptions();
-				//capabilities.s
 				if (headless) {
 					options.addArguments("-headless", "-safe-mode");
 				}
 				capabilities.setCapability(FirefoxOptions.FIREFOX_OPTIONS, options);
-				final FirefoxDriver firefox = new FirefoxDriver();
+				final FirefoxDriver firefox = new FirefoxDriver(capabilities);
 				return firefox;
 		}
     }
