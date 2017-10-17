@@ -1,5 +1,10 @@
 package env;
 
+import io.appium.java_client.android.AndroidDriver;
+import io.appium.java_client.ios.IOSDriver;
+
+import java.net.MalformedURLException;
+import java.net.URL;
 import java.util.concurrent.TimeUnit;
 
 import org.openqa.selenium.By;
@@ -13,6 +18,7 @@ import org.openqa.selenium.edge.EdgeDriver;
 import org.openqa.selenium.firefox.FirefoxDriver;
 import org.openqa.selenium.firefox.FirefoxOptions;
 import org.openqa.selenium.phantomjs.PhantomJSDriver;
+import org.openqa.selenium.remote.CapabilityType;
 import org.openqa.selenium.remote.DesiredCapabilities;
 import org.openqa.selenium.remote.ErrorHandler;
 import org.openqa.selenium.safari.SafariDriver;
@@ -27,6 +33,32 @@ public class DriverUtil {
 		if (driver != null) {
 			return driver;
 		}
+		
+		String enviroment = "desktop";
+		String platform = "";
+		String config = System.getProperty("config", "");
+		
+		if(!config.isEmpty())
+		{
+			enviroment = config.split("_")[0].toLowerCase();
+			platform = config.split("_")[1].toLowerCase();
+		}
+		
+		switch(enviroment)
+		{
+			case "local": if(platform.equals("android"))
+							  return androidDriver();
+						  else if(platform.equals("ios"))
+							  return iosDriver();
+						  else{
+							  System.out.println("unsupported platform");
+							  System.exit(0);
+						  }
+			
+			case "android": return androidDriver(); 
+			case "ios": return iosDriver();
+			case "desktop":break;
+		}
         //System.setProperty("webdriver.chrome.driver", "webdrivers/chromedriver.exe");
         //System.setProperty("webdriver.gecko.driver", "./geckodriver");
         DesiredCapabilities capabilities = null;
@@ -39,6 +71,40 @@ public class DriverUtil {
         return driver;
     }
 
+    private static WebDriver androidDriver()
+    {
+    	DesiredCapabilities capabilities = DesiredCapabilities.android();
+    	capabilities.setCapability("deviceName", "");
+		capabilities.setCapability("platformName", "android");
+		capabilities.setCapability(CapabilityType.VERSION, "");
+		capabilities.setCapability(CapabilityType.BROWSER_NAME, "chrome");
+		capabilities.setCapability("udid", "");
+		String port = "4723";	
+		try {
+			driver = new AndroidDriver(new URL("http://127.0.0.1:"+port+"/wd/hub"),capabilities);
+		} catch (MalformedURLException e) {
+			e.printStackTrace();
+		}
+		return driver;
+    }
+    
+    private static WebDriver iosDriver()
+    {
+    	DesiredCapabilities capabilities = DesiredCapabilities.android();
+    	capabilities.setCapability("deviceName", "");
+		capabilities.setCapability("platformName", "iOS");
+		capabilities.setCapability(CapabilityType.VERSION, "");
+		capabilities.setCapability(CapabilityType.BROWSER_NAME, "safari");
+		capabilities.setCapability("udid", "");
+		String port = "4723";	
+		try {
+			driver = new IOSDriver(new URL("http://127.0.0.1:"+port+"/wd/hub"),capabilities);
+		} catch (MalformedURLException e) {
+			e.printStackTrace();
+		}
+		return driver;
+    }
+    
     /**
      * By default to web driver will be firefox
      *
