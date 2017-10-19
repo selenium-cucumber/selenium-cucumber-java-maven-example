@@ -1,10 +1,13 @@
 package env;
 
-import io.appium.java_client.android.AndroidDriver;
-import io.appium.java_client.ios.IOSDriver;
-
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.InputStream;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.util.Enumeration;
+import java.util.HashMap;
+import java.util.Properties;
 import java.util.concurrent.TimeUnit;
 
 import org.openqa.selenium.By;
@@ -21,14 +24,56 @@ import org.openqa.selenium.phantomjs.PhantomJSDriver;
 import org.openqa.selenium.remote.CapabilityType;
 import org.openqa.selenium.remote.DesiredCapabilities;
 import org.openqa.selenium.remote.ErrorHandler;
+import org.openqa.selenium.remote.RemoteWebDriver;
 import org.openqa.selenium.safari.SafariDriver;
 import org.openqa.selenium.support.ui.ExpectedConditions;
 import org.openqa.selenium.support.ui.WebDriverWait;
 
+import io.appium.java_client.android.AndroidDriver;
+import io.appium.java_client.ios.IOSDriver;
+
 public class DriverUtil {
     public static long DEFAULT_WAIT = 20;
     protected static WebDriver driver=null;
-
+    static String currentPath = System.getProperty("user.dir");
+    static Properties prop = new Properties();
+    static DesiredCapabilities capability=null;
+    
+    public static DesiredCapabilities getCapability(InputStream input) {
+    	DesiredCapabilities capability = new DesiredCapabilities();
+    	try {
+    		prop.load(input);
+    		
+    		// set app path for app testing
+    		if(prop.containsKey("app")) {
+    			String appName = prop.getProperty("app");
+    			String appPath = currentPath+"/src/main/java/appUnderTest/"+appName;
+   				
+    			File appFile = new File(appPath);
+   				if(appFile.exists()) {
+   					prop.setProperty("app", appPath);
+   				}else {
+   					System.out.println("Exception : No app with name '"+appName+"' found in appUnderTest directory");
+   					System.exit(0);
+   				}
+    		}
+    		
+    		// set capabilities
+    		Enumeration<Object> enuKeys = prop.keys();
+    		while (enuKeys.hasMoreElements()) {
+    			String key = (String) enuKeys.nextElement();
+    			String value = prop.getProperty(key);
+    			System.out.println("key :"+key + " Value :"+value);
+    			capability.setCapability(key, value);
+    		}
+    		input.close();
+    	}catch(Exception e) {
+    		e.printStackTrace();
+			System.exit(0);
+    	}
+    	return capability;
+    }
+    
     public static WebDriver getDefaultDriver() {
 		if (driver != null) {
 			return driver;
@@ -40,45 +85,82 @@ public class DriverUtil {
 		
 		if(!config.isEmpty())
 		{
-			enviroment = config.split("_")[0].toLowerCase();
-			platform = config.split("_")[1].toLowerCase();
+			try
+			{
+				enviroment = config.split("_")[0].toLowerCase();
+				platform = config.split("_")[1].toLowerCase();
+			}
+			catch(Exception e)
+			{
+				System.out.println("Exception : Invalid config file name "+config+".properties");
+				System.out.println("Config file format should be : enviroment_platform_device.properties");
+				System.out.println("E.g : local_android_nexus5.properties");
+				System.out.println("E.g : local_ios_iphone6.properties");
+				System.out.println("E.g : browserstack_android_nexus5.properties");
+				System.out.println("E.g : saucelab_windows7_chrome.properties");
+			}
+			
+			try {
+				InputStream input = new FileInputStream(currentPath+"/src/main/java/browserConfigs/"+config+".properties");
+				capability = getCapability(input);
+			}catch (Exception e) {
+				e.printStackTrace();
+				System.exit(0);
+			}
 		}
 		
 		switch(enviroment)
 		{
 			case "local": if(platform.equals("android"))
-							  return androidDriver();
+							  driver = androidDriver(capability);
 						  else if(platform.equals("ios"))
-							  return iosDriver();
+							  driver =  iosDriver(capability);
 						  else{
 							  System.out.println("unsupported platform");
 							  System.exit(0);
 						  }
+						  break;
 			
-			case "android": return androidDriver(); 
-			case "ios": return iosDriver();
-			case "desktop":break;
+			case "browserstack": driver = browserStackDriver(capability);
+								 break;
+			
+			case "desktop": DesiredCapabilities capabilities = null;
+							capabilities = DesiredCapabilities.firefox();
+					        capabilities.setJavascriptEnabled(true);
+					        capabilities.setCapability("takesScreenshot", true);
+					        driver = chooseDriver(capabilities);
+					        driver.manage().timeouts().setScriptTimeout(DEFAULT_WAIT, TimeUnit.SECONDS);
+					        driver.manage().window().maximize();
+					        break;
 		}
-        //System.setProperty("webdriver.chrome.driver", "webdrivers/chromedriver.exe");
-        //System.setProperty("webdriver.gecko.driver", "./geckodriver");
-        DesiredCapabilities capabilities = null;
-		capabilities = DesiredCapabilities.firefox();
-        capabilities.setJavascriptEnabled(true);
-        capabilities.setCapability("takesScreenshot", true);
-        driver = chooseDriver(capabilities);
-        driver.manage().timeouts().setScriptTimeout(DEFAULT_WAIT, TimeUnit.SECONDS);
-        driver.manage().window().maximize();
+        
         return driver;
     }
 
-    private static WebDriver androidDriver()
-    {
-    	DesiredCapabilities capabilities = DesiredCapabilities.android();
-    	capabilities.setCapability("deviceName", "");
-		capabilities.setCapability("platformName", "android");
-		capabilities.setCapability(CapabilityType.VERSION, "");
-		capabilities.setCapability(CapabilityType.BROWSER_NAME, "chrome");
-		capabilities.setCapability("udid", "");
+    private static WebDriver browserStackDriver(DesiredCapabilities capabilities) {
+    	URL remoteDriverURL = null;
+    	try {
+	    	InputStream input = new FileInputStream(currentPath+"/src/main/java/platformConfigs/browserstack.properties");
+			prop.load(input);
+			
+			String url = prop.getProperty("protocol")+
+	    				 "://"+
+	    				 prop.getProperty("username")+
+	    				 ":"+
+	    				 prop.getProperty("access_key")+
+	    				 prop.getProperty("url");
+			
+			input.close();
+			prop.clear();
+	    	System.out.println("url :"+url);
+	    	remoteDriverURL = new URL(url);
+    	}catch(Exception e) {
+    		e.printStackTrace();
+    	}
+    	return new RemoteWebDriver(remoteDriverURL, capability);
+    }
+    
+    private static WebDriver androidDriver(DesiredCapabilities capabilities) {
 		String port = "4723";	
 		try {
 			driver = new AndroidDriver(new URL("http://127.0.0.1:"+port+"/wd/hub"),capabilities);
@@ -88,14 +170,8 @@ public class DriverUtil {
 		return driver;
     }
     
-    private static WebDriver iosDriver()
+    private static WebDriver iosDriver(DesiredCapabilities capabilities)
     {
-    	DesiredCapabilities capabilities = DesiredCapabilities.android();
-    	capabilities.setCapability("deviceName", "");
-		capabilities.setCapability("platformName", "iOS");
-		capabilities.setCapability(CapabilityType.VERSION, "");
-		capabilities.setCapability(CapabilityType.BROWSER_NAME, "safari");
-		capabilities.setCapability("udid", "");
 		String port = "4723";	
 		try {
 			driver = new IOSDriver(new URL("http://127.0.0.1:"+port+"/wd/hub"),capabilities);
