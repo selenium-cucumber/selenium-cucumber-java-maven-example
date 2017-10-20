@@ -1,12 +1,15 @@
 package env;
 
+import io.appium.java_client.android.AndroidDriver;
+import io.appium.java_client.ios.IOSDriver;
+
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.InputStream;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.Enumeration;
-import java.util.HashMap;
 import java.util.Properties;
 import java.util.concurrent.TimeUnit;
 
@@ -21,7 +24,6 @@ import org.openqa.selenium.edge.EdgeDriver;
 import org.openqa.selenium.firefox.FirefoxDriver;
 import org.openqa.selenium.firefox.FirefoxOptions;
 import org.openqa.selenium.phantomjs.PhantomJSDriver;
-import org.openqa.selenium.remote.CapabilityType;
 import org.openqa.selenium.remote.DesiredCapabilities;
 import org.openqa.selenium.remote.ErrorHandler;
 import org.openqa.selenium.remote.RemoteWebDriver;
@@ -29,15 +31,16 @@ import org.openqa.selenium.safari.SafariDriver;
 import org.openqa.selenium.support.ui.ExpectedConditions;
 import org.openqa.selenium.support.ui.WebDriverWait;
 
-import io.appium.java_client.android.AndroidDriver;
-import io.appium.java_client.ios.IOSDriver;
-
 public class DriverUtil {
     public static long DEFAULT_WAIT = 20;
     protected static WebDriver driver=null;
     static String currentPath = System.getProperty("user.dir");
     static Properties prop = new Properties();
     static DesiredCapabilities capability=null;
+    
+    public static void uploadAppToSauceLab(String appPath){
+    	
+    }
     
     public static DesiredCapabilities getCapability(InputStream input) {
     	DesiredCapabilities capability = new DesiredCapabilities();
@@ -47,6 +50,11 @@ public class DriverUtil {
     		// set app path for app testing
     		if(prop.containsKey("app")) {
     			String appName = prop.getProperty("app");
+    			if(appName.contains("sauce-stroage")){
+    				appName=appName.split(":")[1];
+    				String appPath = currentPath+"/src/main/java/appUnderTest/"+appName;
+    				uploadAppToSauceLab(appPath);
+    			}
     			String appPath = currentPath+"/src/main/java/appUnderTest/"+appName;
    				
     			File appFile = new File(appPath);
@@ -63,10 +71,10 @@ public class DriverUtil {
     		while (enuKeys.hasMoreElements()) {
     			String key = (String) enuKeys.nextElement();
     			String value = prop.getProperty(key);
-    			System.out.println("key :"+key + " Value :"+value);
     			capability.setCapability(key, value);
     		}
     		input.close();
+    		prop.clear();
     	}catch(Exception e) {
     		e.printStackTrace();
 			System.exit(0);
@@ -103,8 +111,8 @@ public class DriverUtil {
 			try {
 				InputStream input = new FileInputStream(currentPath+"/src/main/java/browserConfigs/"+config+".properties");
 				capability = getCapability(input);
-			}catch (Exception e) {
-				e.printStackTrace();
+			}catch (FileNotFoundException e) {
+				System.out.println("\nException : Config file not found with name '"+config+".properties'");
 				System.exit(0);
 			}
 		}
@@ -116,7 +124,7 @@ public class DriverUtil {
 						  else if(platform.equals("ios"))
 							  driver =  iosDriver(capability);
 						  else{
-							  System.out.println("unsupported platform");
+							  System.out.println("Exception : unsupported platform");
 							  System.exit(0);
 						  }
 						  break;
@@ -124,6 +132,9 @@ public class DriverUtil {
 			case "browserstack": driver = browserStackDriver(capability);
 								 break;
 			
+			case "saucelab": driver = sauceLabDriver(capability);
+			 					 break;
+
 			case "desktop": DesiredCapabilities capabilities = null;
 							capabilities = DesiredCapabilities.firefox();
 					        capabilities.setJavascriptEnabled(true);
@@ -132,11 +143,35 @@ public class DriverUtil {
 					        driver.manage().timeouts().setScriptTimeout(DEFAULT_WAIT, TimeUnit.SECONDS);
 					        driver.manage().window().maximize();
 					        break;
+					        
+			default : System.out.println("Exception : Unsupported Enviroment");
+					  System.exit(0);
 		}
-        
         return driver;
     }
 
+    private static WebDriver sauceLabDriver(DesiredCapabilities capabilities) {
+    	URL remoteDriverURL = null;
+    	try {
+	    	InputStream input = new FileInputStream(currentPath+"/src/main/java/platformConfigs/saucelab.properties");
+			prop.load(input);
+			
+			String url = prop.getProperty("protocol")+
+	    				 "://"+
+	    				 prop.getProperty("username")+
+	    				 ":"+
+	    				 prop.getProperty("access_key")+
+	    				 prop.getProperty("url");
+			
+			input.close();
+			prop.clear();
+	    	remoteDriverURL = new URL(url);
+    	}catch(Exception e) {
+    		e.printStackTrace();
+    	}
+    	return new RemoteWebDriver(remoteDriverURL, capability);
+    }
+    
     private static WebDriver browserStackDriver(DesiredCapabilities capabilities) {
     	URL remoteDriverURL = null;
     	try {
@@ -152,7 +187,6 @@ public class DriverUtil {
 			
 			input.close();
 			prop.clear();
-	    	System.out.println("url :"+url);
 	    	remoteDriverURL = new URL(url);
     	}catch(Exception e) {
     		e.printStackTrace();
