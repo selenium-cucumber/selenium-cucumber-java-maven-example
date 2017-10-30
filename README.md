@@ -11,7 +11,7 @@ Automate your test cases with minimal coding.
 
 Documentation
 -------------
-* [Installation](doc/installation.md)
+* [Installation](https://github.com/selenium-cucumber/selenium-cucumber-java/blob/master/doc/installation.md)
 * [Predefined steps](https://github.com/selenium-cucumber/selenium-cucumber-java/blob/master/doc/canned_steps.md)
 
 Download a Framework
