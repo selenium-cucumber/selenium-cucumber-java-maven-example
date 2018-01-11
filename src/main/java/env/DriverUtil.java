@@ -1,12 +1,17 @@
 package env;
 
+import java.io.BufferedInputStream;
+import java.io.BufferedOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.IOException;
 import java.io.InputStream;
+import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.net.URLConnection;
+import java.util.Base64;
 import java.util.Enumeration;
-import java.util.HashMap;
 import java.util.Properties;
 import java.util.concurrent.TimeUnit;
 
@@ -20,8 +25,6 @@ import org.openqa.selenium.chrome.ChromeOptions;
 import org.openqa.selenium.edge.EdgeDriver;
 import org.openqa.selenium.firefox.FirefoxDriver;
 import org.openqa.selenium.firefox.FirefoxOptions;
-import org.openqa.selenium.phantomjs.PhantomJSDriver;
-import org.openqa.selenium.remote.CapabilityType;
 import org.openqa.selenium.remote.DesiredCapabilities;
 import org.openqa.selenium.remote.ErrorHandler;
 import org.openqa.selenium.remote.RemoteWebDriver;
@@ -43,19 +46,12 @@ public class DriverUtil {
     	DesiredCapabilities capability = new DesiredCapabilities();
     	try {
     		prop.load(input);
-    		
-    		// set app path for app testing
     		if(prop.containsKey("app")) {
     			String appName = prop.getProperty("app");
-    			String appPath = currentPath+"/src/main/java/appUnderTest/"+appName;
-   				
-    			File appFile = new File(appPath);
-   				if(appFile.exists()) {
-   					prop.setProperty("app", appPath);
-   				}else {
-   					System.out.println("Exception : No app with name '"+appName+"' found in appUnderTest directory");
-   					System.exit(0);
-   				}
+    			if(!appName.contains("sauce-storage")) {
+    				String appPath = currentPath+"/src/main/java/appUnderTest/"+appName;
+    				prop.setProperty("app", appPath);
+    			}
     		}
     		
     		// set capabilities
@@ -63,7 +59,6 @@ public class DriverUtil {
     		while (enuKeys.hasMoreElements()) {
     			String key = (String) enuKeys.nextElement();
     			String value = prop.getProperty(key);
-    			System.out.println("key :"+key + " Value :"+value);
     			capability.setCapability(key, value);
     		}
     		input.close();
@@ -74,7 +69,68 @@ public class DriverUtil {
     	return capability;
     }
     
-    public static WebDriver getDefaultDriver() {
+    private static void uploadAppToSauceStorage(String appName, String appPath) {
+    	System.out.println("Uploading App "+appName+" to sauce storage");
+    	InputStream input;
+		try {
+			input = new FileInputStream(currentPath+"/src/main/java/platformConfigs/saucelab.properties");
+			prop.load(input);
+		} catch (IOException e1) {
+			e1.printStackTrace();
+		}
+		
+		String username = prop.getProperty("username");
+		String access_key = prop.getProperty("access_key");
+    	
+    	String uploadURL = "https://saucelabs.com/rest/v1/storage/"+username+"/"+appName+"?overwrite=true";
+    	String encoding = Base64.getEncoder().encodeToString((username+":"+access_key).getBytes());
+
+    	URLConnection urlconnection = null;
+		try {
+			File file = new File(appPath);
+			URL url = new URL(uploadURL);
+			urlconnection = url.openConnection();
+			urlconnection.setDoOutput(true);
+			urlconnection.setDoInput(true);
+
+			if (urlconnection instanceof HttpURLConnection) {
+				((HttpURLConnection) urlconnection).setRequestMethod("POST");
+				((HttpURLConnection) urlconnection).setRequestProperty("Content-type", "text/plain");
+				((HttpURLConnection) urlconnection).setRequestProperty("Authorization", "Basic " + encoding);
+				((HttpURLConnection) urlconnection).connect();
+			}
+
+			BufferedOutputStream bos = new BufferedOutputStream(urlconnection.getOutputStream());
+			BufferedInputStream bis = new BufferedInputStream(new FileInputStream(file));
+			int i;
+			// read byte by byte until end of stream
+			while ((i = bis.read()) > 0) {
+				bos.write(i);
+			}
+			bis.close();
+			bos.close();
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		try {
+
+			int responseCode = ((HttpURLConnection) urlconnection).getResponseCode();
+			if ((responseCode >= 200) && (responseCode <= 202)) {
+				System.out.println("App uploaded successfully");
+			}
+			else {
+				System.out.println("App upload failed");
+			}
+			System.out.println("responseCode : "+responseCode);
+			
+			((HttpURLConnection) urlconnection).disconnect();
+
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+	}
+
+	public static WebDriver getDefaultDriver() {
 		if (driver != null) {
 			return driver;
 		}
@@ -85,13 +141,11 @@ public class DriverUtil {
 		
 		if(!config.isEmpty())
 		{
-			try
-			{
+			try{
 				enviroment = config.split("_")[0].toLowerCase();
 				platform = config.split("_")[1].toLowerCase();
 			}
-			catch(Exception e)
-			{
+			catch(Exception e){
 				System.out.println("Exception : Invalid config file name "+config+".properties");
 				System.out.println("Config file format should be : enviroment_platform_device.properties");
 				System.out.println("E.g : local_android_nexus5.properties");
@@ -124,6 +178,9 @@ public class DriverUtil {
 			case "browserstack": driver = browserStackDriver(capability);
 								 break;
 			
+			case "saucelab": driver = saucelabDriver(capability);
+			 					 break;
+			 					 
 			case "desktop": DesiredCapabilities capabilities = null;
 							capabilities = DesiredCapabilities.firefox();
 					        capabilities.setJavascriptEnabled(true);
@@ -137,6 +194,63 @@ public class DriverUtil {
         return driver;
     }
 
+    /*
+     * Returns saucelab remote driver instance by reading saucelab configuration
+     * from platformConfigs/saucelab.properties
+     * 
+     * @param DesiredCapabilities create capabilities by reading browser config.
+     * @return RemoteWebDriver
+     */
+    private static WebDriver saucelabDriver(DesiredCapabilities capabilities) {
+    	URL remoteDriverURL = null;
+    	RemoteWebDriver remoteDriver = null;
+    	
+    	// set app path for app testing
+		if(prop.containsKey("app")) {
+			String appName = prop.getProperty("app").split(":")[1];
+			String appPath = currentPath+"/src/main/java/appUnderTest/"+appName;
+				
+			File appFile = new File(appPath);
+				if(appFile.exists()) {
+					//prop.setProperty("app", appPath);
+					uploadAppToSauceStorage(appName, appPath);
+				}else {
+					System.out.println("Exception : No app with name '"+appName+"' found in appUnderTest directory");
+					System.exit(0);
+				}
+		}
+		
+		
+    	try {
+	    	InputStream input = new FileInputStream(currentPath+"/src/main/java/platformConfigs/saucelab.properties");
+			prop.load(input);
+			
+			String url = prop.getProperty("protocol")+
+	    				 "://"+
+	    				 prop.getProperty("username")+
+	    				 ":"+
+	    				 prop.getProperty("access_key")+
+	    				 prop.getProperty("url");
+			
+			input.close();
+			prop.clear();
+	    	remoteDriverURL = new URL(url);
+	    	remoteDriver = new RemoteWebDriver(remoteDriverURL, capability);
+    	}catch(Exception e) {
+    		System.out.println("\nException Occured :\n");
+    		System.out.println(e.getMessage());
+    		System.exit(0);
+    	}
+    	return remoteDriver;
+    }
+    
+    /*
+     * Returns browserStack remote driver instance by reading browserStack configuration
+     * from platformConfigs/browserstack.properties
+     * 
+     * @param DesiredCapabilities create capabilities by reading browser config.
+     * @return RemoteWebDriver
+     */
     private static WebDriver browserStackDriver(DesiredCapabilities capabilities) {
     	URL remoteDriverURL = null;
     	try {
@@ -152,7 +266,6 @@ public class DriverUtil {
 			
 			input.close();
 			prop.clear();
-	    	System.out.println("url :"+url);
 	    	remoteDriverURL = new URL(url);
     	}catch(Exception e) {
     		e.printStackTrace();
@@ -163,7 +276,7 @@ public class DriverUtil {
     private static WebDriver androidDriver(DesiredCapabilities capabilities) {
 		String port = "4723";	
 		try {
-			driver = new AndroidDriver(new URL("http://127.0.0.1:"+port+"/wd/hub"),capabilities);
+			driver = (AndroidDriver) new AndroidDriver(new URL("http://127.0.0.1:"+port+"/wd/hub"),capabilities);
 		} catch (MalformedURLException e) {
 			e.printStackTrace();
 		}
@@ -174,7 +287,7 @@ public class DriverUtil {
     {
 		String port = "4723";	
 		try {
-			driver = new IOSDriver(new URL("http://127.0.0.1:"+port+"/wd/hub"),capabilities);
+			driver = (IOSDriver) new IOSDriver(new URL("http://127.0.0.1:"+port+"/wd/hub"),capabilities);
 		} catch (MalformedURLException e) {
 			e.printStackTrace();
 		}
@@ -226,8 +339,6 @@ public class DriverUtil {
 					System.exit(0);
 				}
 				return driver;
-			case "PhantomJS":
-				return new PhantomJSDriver(capabilities);
 			default:
 				FirefoxOptions options = new FirefoxOptions();
 				if (headless) {
@@ -255,8 +366,8 @@ public class DriverUtil {
 	public static void closeDriver() {
 		if (driver != null) {
 			try {
-				driver.close();
-				driver.quit(); // fails in current geckodriver! TODO: Fixme
+				//driver.close();
+				//driver.quit(); // fails in current geckodriver! TODO: Fixme
 			} catch (NoSuchMethodError nsme) { // in case quit fails
 			} catch (NoSuchSessionException nsse) { // in case close fails
 			} catch (SessionNotCreatedException snce) {} // in case close fails
