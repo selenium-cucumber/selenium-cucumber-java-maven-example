@@ -18,6 +18,37 @@ Download a Framework
 --------------
 * Maven - https://github.com/selenium-cucumber/selenium-cucumber-java-maven-example
 
+Framework Architecture
+--------------
+	Project-Name
+		|
+		|_src/main/java
+		|	|_appUnderTest
+		|	|	|_calc.apk
+		|	|	|...
+		|	|_browserConfigs
+		|	|	|_saucelab_windows_chrome.properties
+		|	|	|_browserstack_windows_chrome.properties
+		|	|	|...
+		|	|_platformConfigs
+		|		|_saucelab.properties
+		|		|_browserstack.properties
+		|		|...
+		|_src/main/resources
+		|_src/test/java
+		|	|_env
+		|	|	|_DriverUtil.java
+		|	|	|_Hooks.java
+		|	|	|_RunCukeTest.java
+		|	|_userStepDefinitions
+		|	|	|_loginSteps.java
+		|	|	|_signUpSteps.java
+		|	|	|...
+		|_src/test/resources
+		|	|_features
+		|	|	|_login.feature
+		|	|	|_signUp.feature
+
 Writing a test
 --------------
 
