@@ -80,6 +80,21 @@ Go to your project directory from terminal and hit following commands
 * `mvn test -Dcucumber.options="–-plugin html:target/result-html"` to generate a HTML report.
 * `mvn test -Dcucumber.options="–-plugin json:target/result-json"` to generate a JSON report.
 
+Running test On remote browser/platform
+---------------------------------------
+
+To run test on saucelab, browserstack or any other remote browser you need to create browser config file under src/main/java/browserConfig
+
+To run on saucelab create config file with name preceding with saucelab
+E.g. 	saucelab_windows_chrome.properties
+		saucelab_mac_firefox.properties
+* `mvn test "-Dconfig=saucelab_mac_firefox"`
+
+To run on browserstack create config file with name preceding with browserstack
+E.g. 	browserstack_windows_chrome.properties
+		browserstack_mac_firefox.properties
+* `mvn test "-Dconfig=browserstack_mac_firefox"`
+
 Maven/Gradle Dependency
 -----------------------
 
