@@ -1,4 +1,4 @@
-package info.seleniumcucumber.userStepDefintions;
+package env;
 
 import org.junit.runner.RunWith;
 

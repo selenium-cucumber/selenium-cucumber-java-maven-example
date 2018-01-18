@@ -1,4 +1,4 @@
-package info.seleniumcucumber.userStepDefintions;
+package env;
 
 import cucumber.api.Scenario;
 import cucumber.api.java.After;
