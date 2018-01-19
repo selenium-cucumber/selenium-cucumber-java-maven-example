@@ -48,7 +48,14 @@
 		<dependency>
 		    <groupId>com.github.selenium-cucumber</groupId>
 		    <artifactId>selenium-cucumber-java</artifactId>
-		    <version>1.0.0</version>
+		    <version>1.0.1-beta</version>
+		</dependency>
+		
+		<!-- These are the Appium dependencies -->	
+		<dependency>
+		    <groupId>io.appium</groupId>
+		    <artifactId>java-client</artifactId>
+		    <version>5.0.4</version>
 		</dependency>
 	</dependencies>
 	
