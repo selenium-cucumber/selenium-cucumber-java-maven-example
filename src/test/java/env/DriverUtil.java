@@ -144,21 +144,16 @@ public class DriverUtil {
 			try{
 				enviroment = config.split("_")[0].toLowerCase();
 				platform = config.split("_")[1].toLowerCase();
+				InputStream input = new FileInputStream(currentPath+"/src/main/java/browserConfigs/"+config+".properties");
+				capability = getCapability(input);
 			}
 			catch(Exception e){
-				System.out.println("Exception : Invalid config file name "+config+".properties");
+				System.out.println("\nException : File not present or Invalid config file name "+config+".properties");
 				System.out.println("Config file format should be : enviroment_platform_device.properties");
-				System.out.println("E.g : local_android_nexus5.properties");
+				System.out.println("\nE.g : local_android_nexus5.properties");
 				System.out.println("E.g : local_ios_iphone6.properties");
 				System.out.println("E.g : browserstack_android_nexus5.properties");
 				System.out.println("E.g : saucelab_windows7_chrome.properties");
-			}
-			
-			try {
-				InputStream input = new FileInputStream(currentPath+"/src/main/java/browserConfigs/"+config+".properties");
-				capability = getCapability(input);
-			}catch (Exception e) {
-				e.printStackTrace();
 				System.exit(0);
 			}
 		}
@@ -189,6 +184,9 @@ public class DriverUtil {
 					        driver.manage().timeouts().setScriptTimeout(DEFAULT_WAIT, TimeUnit.SECONDS);
 					        driver.manage().window().maximize();
 					        break;
+			
+			default : 	System.out.println("\nException : Invalid platform "+enviroment);
+						System.exit(0);
 		}
         
         return driver;
